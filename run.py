@@ -117,7 +117,7 @@ async def main():
     queue = asyncio.Queue(workers_num)
 
     futures = [producer(queue)] + [worker(queue) for _ in range(workers_num)]
-    await asyncio.gather(*futures)
+    await asyncio.wait(futures)
 
     print("XFA:")
     print(xfa)
