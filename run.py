@@ -132,7 +132,7 @@ async def main(directory):
             tar.add(pdf_path, arcname=pdf_path[len("prova") :])
 
     with tarfile.open("tagged.tar.gz", "w:gz") as tar:
-        for pdf_path in tagged[-14:]:
+        for pdf_path in tagged[-42:]:
             tar.add(pdf_path, arcname=pdf_path[len("prova") :])
 
 
