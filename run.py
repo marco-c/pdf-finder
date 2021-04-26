@@ -63,7 +63,7 @@ async def analyze(pdf_path):
         if proc.returncode != 0:
             print(
                 "Error while uncompressing {}:\n```\n{}```".format(
-                    pdf_path, stderr.decode("ascii")
+                    pdf_path, stderr.decode("ascii", "ignore")
                 )
             )
             return
