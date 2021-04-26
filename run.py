@@ -119,11 +119,6 @@ async def main():
     futures = [producer(queue)] + [worker(queue) for _ in range(workers_num)]
     await asyncio.wait(futures)
 
-    print("XFA:")
-    print(xfa)
-    print("JS:")
-    print(js)
-
     print(f"Found {len(xfa)} PDFs that use XFA")
     print(f"Found {len(js)} PDFs that use JavaScript")
     print(f"Found {len(tagged)} PDFs that have tags")
