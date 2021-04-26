@@ -95,9 +95,9 @@ async def worker(queue):
         await analyze(path)
 
 
-async def producer(queue):
+async def producer(directory, queue):
     paths = []
-    for root, dirs, files in os.walk("prova"):
+    for root, dirs, files in os.walk(directory):
         for name in files:
             if not name.endswith("pdf"):
                 continue
@@ -112,7 +112,7 @@ async def producer(queue):
         await queue.put(None)
 
 
-async def main():
+async def main(directory):
     workers_num = min(32, os.cpu_count() + 4)
     queue = asyncio.Queue(workers_num)
 
@@ -136,4 +136,4 @@ async def main():
             tar.add(pdf_path, arcname=pdf_path[len("prova") :])
 
 
-asyncio.run(main())
+asyncio.run(main("prova"))
