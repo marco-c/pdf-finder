@@ -4,16 +4,24 @@
 # You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import asyncio
+import collections
+import json
 import os
 import re
 import resource
 import tarfile
+import typing
 
 import aiofiles
 from tqdm import tqdm
 
 xfa_regex = re.compile(
     rb"<[\r\n \t]*template[\r\n \t]+xmlns=\"http://www.xfa.org/schema/xfa-template/",
+    re.IGNORECASE,
+)
+
+image_regex = re.compile(
+    rb"<[\r\n \t]*image[\r\n \t]*contentType=\"([\w/+]+)\"",
     re.IGNORECASE,
 )
 
@@ -42,6 +50,7 @@ xfa = []
 js = []
 tosource = []
 tagged = []
+image_types: typing.Counter[str] = collections.Counter()
 
 
 def limit_virtual_memory():
@@ -53,7 +62,7 @@ async def analyze(pdf_path):
 
     try:
         async with aiofiles.open(types_path, "r") as f:
-            types = await f.read()
+            types = json.loads(await f.read())
     except FileNotFoundError:
         proc = await asyncio.create_subprocess_exec(
             "qpdf",
@@ -75,27 +84,40 @@ async def analyze(pdf_path):
             )
             return
 
-        types = ""
+        used_image_types = list(
+            set(result.decode("ascii") for result in image_regex.findall(pdf_content))
+        )
+
+        types = {
+            "x": 0,
+            "j": 0,
+            "s": 0,
+            "t": 0,
+            "i": used_image_types,
+        }
         if is_XFA(pdf_content):
-            types += "x"
+            types["x"] = 1
         if is_JS(pdf_content):
-            types += "j"
+            types["j"] = 1
             if b"toSource" in pdf_content:
-                types += "s"
+                types["s"] = 1
         if is_tagged(pdf_content):
-            types += "t"
+            types["t"] = 1
 
         async with aiofiles.open(types_path, "w") as f:
-            await f.write(types)
+            await f.write(json.dumps(types))
 
-    if "x" in types:
+    if types["x"]:
         xfa.append(pdf_path)
-    if "j" in types:
+    if types["j"]:
         js.append(pdf_path)
-        if "s" in types:
+        if types["s"]:
             tosource.append(pdf_path)
-    if "t" in types:
+    if types["t"]:
         tagged.append(pdf_path)
+
+    for image_type in types["i"]:
+        image_types[image_type] += 1
 
 
 async def worker(queue):
@@ -138,6 +160,9 @@ async def main(directories):
     print(f"Found {len(set(xfa) & set(js))} PDFs that use XFA and JavaScript")
     print(f"Found {len(tosource)} PDFs that use toSource")
     print(f"Found {len(tagged)} PDFs that have tags")
+
+    print("Most common image types:")
+    print(image_types.most_common())
 
     for type_name, type_list in (("xfa", xfa), ("js", js), ("tagged", tagged[-42:])):
         with tarfile.open(f"{type_name}.tar.gz", "w:gz") as tar:
