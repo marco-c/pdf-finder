@@ -139,17 +139,10 @@ async def main(directories):
     print(f"Found {len(tosource)} PDFs that use toSource")
     print(f"Found {len(tagged)} PDFs that have tags")
 
-    with tarfile.open("xfa.tar.gz", "w:gz") as tar:
-        for pdf_path in xfa:
-            tar.add(pdf_path, arcname=pdf_path[len("prova") :])
-
-    with tarfile.open("js.tar.gz", "w:gz") as tar:
-        for pdf_path in js:
-            tar.add(pdf_path, arcname=pdf_path[len("prova") :])
-
-    with tarfile.open("tagged.tar.gz", "w:gz") as tar:
-        for pdf_path in tagged[-42:]:
-            tar.add(pdf_path, arcname=pdf_path[len("prova") :])
+    for type_name, type_list in (("xfa", xfa), ("js", js), ("tagged", tagged[-42:])):
+        with tarfile.open(f"{type_name}.tar.gz", "w:gz") as tar:
+            for pdf_path in type_list:
+                tar.add(pdf_path)
 
 
 asyncio.run(main(["crawled", "pdfa"]))
