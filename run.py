@@ -101,14 +101,15 @@ async def worker(queue):
         await analyze(path)
 
 
-async def producer(directory, queue):
+async def producer(directories, queue):
     paths = []
-    for root, dirs, files in os.walk(directory):
-        for name in files:
-            if not name.endswith("pdf"):
-                continue
+    for directory in directories:
+        for root, dirs, files in os.walk(directory):
+            for name in files:
+                if not name.endswith("pdf"):
+                    continue
 
-            paths.append(os.path.join(root, name))
+                paths.append(os.path.join(root, name))
 
     for path in tqdm(paths):
         await queue.put(path)
@@ -118,11 +119,13 @@ async def producer(directory, queue):
         await queue.put(None)
 
 
-async def main(directory):
+async def main(directories):
     workers_num = min(32, os.cpu_count() + 4)
     queue = asyncio.Queue(workers_num)
 
-    futures = [producer(queue)] + [worker(queue) for _ in range(workers_num)]
+    futures = [producer(directories, queue)] + [
+        worker(queue) for _ in range(workers_num)
+    ]
     await asyncio.wait(futures)
 
     print(f"Found {len(xfa)} PDFs that use XFA")
@@ -142,4 +145,4 @@ async def main(directory):
             tar.add(pdf_path, arcname=pdf_path[len("prova") :])
 
 
-asyncio.run(main("prova"))
+asyncio.run(main(["crawled", "pdfa"]))
