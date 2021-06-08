@@ -6,6 +6,7 @@
 import asyncio
 import os
 import re
+import resource
 import tarfile
 
 import aiofiles
@@ -42,6 +43,10 @@ js = []
 tagged = []
 
 
+def limit_virtual_memory():
+    resource.setrlimit(resource.RLIMIT_AS, (4096 * 1024 * 1024, 4096 * 1024 * 1024))
+
+
 async def analyze(pdf_path):
     types_path = f"{pdf_path[:-4]}___TYPES___.json"
 
@@ -56,6 +61,7 @@ async def analyze(pdf_path):
             "-",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            preexec_fn=limit_virtual_memory,
         )
 
         pdf_content, stderr = await proc.communicate()
