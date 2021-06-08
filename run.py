@@ -130,6 +130,7 @@ async def main(directories):
 
     print(f"Found {len(xfa)} PDFs that use XFA")
     print(f"Found {len(js)} PDFs that use JavaScript")
+    print(f"Found {len(set(xfa) & set(js))} PDFs that use XFA and JavaScript")
     print(f"Found {len(tagged)} PDFs that have tags")
 
     with tarfile.open("xfa.tar.gz", "w:gz") as tar:
