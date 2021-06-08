@@ -25,6 +25,16 @@ image_regex = re.compile(
     re.IGNORECASE,
 )
 
+used_font_regex = re.compile(
+    rb"typeface=\"([^\"]+)\"",
+    re.IGNORECASE,
+)
+
+embedded_font_regex = re.compile(
+    rb"/FontFamily \(([^)]+)\)",
+    re.IGNORECASE,
+)
+
 
 def is_XFA(content):
     return xfa_regex.search(content) is not None
@@ -51,6 +61,7 @@ js = []
 tosource = []
 tagged = []
 image_types: typing.Counter[str] = collections.Counter()
+fonts: typing.Counter[str] = collections.Counter()
 
 
 def limit_virtual_memory():
@@ -84,8 +95,16 @@ async def analyze(pdf_path):
             )
             return
 
-        used_image_types = list(
-            set(result.decode("ascii") for result in image_regex.findall(pdf_content))
+        used_image_types = set(
+            result.decode("ascii") for result in image_regex.findall(pdf_content)
+        )
+
+        used_fonts = set(
+            result.decode("ascii") for result in used_font_regex.findall(pdf_content)
+        )
+        embedded_fonts = set(
+            result.decode("ascii")
+            for result in embedded_font_regex.findall(pdf_content)
         )
 
         types = {
@@ -93,8 +112,10 @@ async def analyze(pdf_path):
             "j": 0,
             "s": 0,
             "t": 0,
-            "i": used_image_types,
+            "i": list(used_image_types),
+            "f": list(used_fonts - embedded_fonts),
         }
+
         if is_XFA(pdf_content):
             types["x"] = 1
         if is_JS(pdf_content):
@@ -118,6 +139,9 @@ async def analyze(pdf_path):
 
     for image_type in types["i"]:
         image_types[image_type] += 1
+
+    for font in types["f"]:
+        fonts[font] += 1
 
 
 async def worker(queue):
@@ -163,6 +187,9 @@ async def main(directories):
 
     print("Most common image types:")
     print(image_types.most_common())
+
+    print("Most common used fonts that are not embedded:")
+    print(fonts.most_common())
 
     for type_name, type_list in (("xfa", xfa), ("js", js), ("tagged", tagged[-42:])):
         with tarfile.open(f"{type_name}.tar.gz", "w:gz") as tar:
