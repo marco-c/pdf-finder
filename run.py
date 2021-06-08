@@ -40,6 +40,7 @@ def is_tagged(content):
 
 xfa = []
 js = []
+tosource = []
 tagged = []
 
 
@@ -79,6 +80,8 @@ async def analyze(pdf_path):
             types += "x"
         if is_JS(pdf_content):
             types += "j"
+            if b"toSource" in pdf_content:
+                types += "s"
         if is_tagged(pdf_content):
             types += "t"
 
@@ -89,6 +92,8 @@ async def analyze(pdf_path):
         xfa.append(pdf_path)
     if "j" in types:
         js.append(pdf_path)
+        if "s" in types:
+            tosource.append(pdf_path)
     if "t" in types:
         tagged.append(pdf_path)
 
@@ -131,6 +136,7 @@ async def main(directories):
     print(f"Found {len(xfa)} PDFs that use XFA")
     print(f"Found {len(js)} PDFs that use JavaScript")
     print(f"Found {len(set(xfa) & set(js))} PDFs that use XFA and JavaScript")
+    print(f"Found {len(tosource)} PDFs that use toSource")
     print(f"Found {len(tagged)} PDFs that have tags")
 
     with tarfile.open("xfa.tar.gz", "w:gz") as tar:
