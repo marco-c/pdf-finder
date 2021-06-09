@@ -35,6 +35,11 @@ embedded_font_regex = re.compile(
     re.IGNORECASE,
 )
 
+rectangle_regex = re.compile(
+    rb"<[\r\n \t]*rectangle",
+    re.IGNORECASE,
+)
+
 
 def is_XFA(content):
     return xfa_regex.search(content) is not None
@@ -56,10 +61,15 @@ def is_tagged(content):
     return b"/MarkInfo" in content and b"/Marked true" in content
 
 
+def is_using_rectangles(content):
+    return rectangle_regex.search(content) is not None
+
+
 xfa = []
 js = []
 tosource = []
 tagged = []
+rectangles = []
 image_types: typing.Counter[str] = collections.Counter()
 fonts: typing.Counter[str] = collections.Counter()
 
@@ -112,6 +122,7 @@ async def analyze(pdf_path):
             "j": 0,
             "s": 0,
             "t": 0,
+            "r": 0,
             "i": list(used_image_types),
             "f": list(used_fonts - embedded_fonts),
         }
@@ -124,6 +135,8 @@ async def analyze(pdf_path):
                 types["s"] = 1
         if is_tagged(pdf_content):
             types["t"] = 1
+        if is_using_rectangles(pdf_content):
+            types["r"] = 1
 
         async with aiofiles.open(types_path, "w") as f:
             await f.write(json.dumps(types))
@@ -136,6 +149,8 @@ async def analyze(pdf_path):
             tosource.append(pdf_path)
     if types["t"]:
         tagged.append(pdf_path)
+    if types["r"]:
+        rectangles.append(pdf_path)
 
     for image_type in types["i"]:
         image_types[image_type] += 1
@@ -184,6 +199,7 @@ async def main(directories):
     print(f"Found {len(set(xfa) & set(js))} PDFs that use XFA and JavaScript")
     print(f"Found {len(tosource)} PDFs that use toSource")
     print(f"Found {len(tagged)} PDFs that have tags")
+    print(f"Found {len(rectangles)} PDFs that use rectangles")
 
     print("Most common image types:")
     print(image_types.most_common())
