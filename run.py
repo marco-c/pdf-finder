@@ -189,10 +189,13 @@ async def main(directories):
     workers_num = min(32, os.cpu_count() + 4)
     queue = asyncio.Queue(workers_num)
 
-    futures = [producer(directories, queue)] + [
-        worker(queue) for _ in range(workers_num)
+    futures = [asyncio.create_task(producer(directories, queue))] + [
+        asyncio.create_task(worker(queue)) for _ in range(workers_num)
     ]
-    await asyncio.wait(futures)
+    await asyncio.wait(futures, return_when=asyncio.FIRST_EXCEPTION)
+    for future in futures:
+        if future.done():
+            future.result()
 
     print(f"Found {len(xfa)} PDFs that use XFA")
     print(f"Found {len(js)} PDFs that use JavaScript")
