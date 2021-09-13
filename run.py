@@ -45,6 +45,11 @@ purexfa_regex = re.compile(
     re.IGNORECASE,
 )
 
+xfa_host_regex = re.compile(
+    rb"xfa\.host\.([^\W]+)",
+    re.IGNORECASE,
+)
+
 
 def is_XFA(content):
     return xfa_regex.search(content) is not None
@@ -87,6 +92,7 @@ encrypted = []
 purexfa = []
 image_types: typing.Counter[str] = collections.Counter()
 fonts: typing.Counter[str] = collections.Counter()
+xfa_host_funcs: typing.Counter[str] = collections.Counter()
 
 
 def limit_virtual_memory():
@@ -110,6 +116,7 @@ async def analyze(pdf_path):
             "f": [],
             "e": 0,
             "p": 0,
+            "xh": [],
         }
 
         async with aiofiles.open(pdf_path, "rb") as f:
@@ -153,6 +160,11 @@ async def analyze(pdf_path):
         )
         types["f"] = list(used_fonts - embedded_fonts)
 
+        used_xfa_host_funcs = set(
+            result.decode("ascii") for result in xfa_host_regex.findall(pdf_content)
+        )
+        types["xh"] = list(used_xfa_host_funcs)
+
         if is_XFA(pdf_content):
             types["x"] = 1
         if is_JS(pdf_content):
@@ -189,6 +201,9 @@ async def analyze(pdf_path):
 
     for font in types["f"]:
         fonts[font] += 1
+
+    for xfa_host_func in types["xh"]:
+        xfa_host_funcs[xfa_host_func] += 1
 
 
 async def worker(queue):
@@ -243,6 +258,9 @@ async def main(directories):
 
     print("Most common used fonts that are not embedded:")
     print(fonts.most_common())
+
+    print("Most commonly used xfa.host.XXX:")
+    print(xfa_host_funcs.most_common())
 
     for type_name, type_list in (("xfa", xfa), ("js", js), ("tagged", tagged[-42:])):
         with tarfile.open(f"{type_name}.tar.gz", "w:gz") as tar:
