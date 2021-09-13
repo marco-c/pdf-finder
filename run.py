@@ -65,11 +65,16 @@ def is_using_rectangles(content):
     return rectangle_regex.search(content) is not None
 
 
+def is_encrypted(content):
+    return b"/Encrypt " in content
+
+
 xfa = []
 js = []
 tosource = []
 tagged = []
 rectangles = []
+encrypted = []
 image_types: typing.Counter[str] = collections.Counter()
 fonts: typing.Counter[str] = collections.Counter()
 
@@ -85,6 +90,23 @@ async def analyze(pdf_path):
         async with aiofiles.open(types_path, "r") as f:
             types = json.loads(await f.read())
     except FileNotFoundError:
+        types = {
+            "x": 0,
+            "j": 0,
+            "s": 0,
+            "t": 0,
+            "r": 0,
+            "i": [],
+            "f": [],
+            "e": 0,
+        }
+
+        async with aiofiles.open(pdf_path, "rb") as f:
+            orig_pdf_content = await f.read()
+
+        if is_encrypted(orig_pdf_content):
+            types["e"] = 1
+
         proc = await asyncio.create_subprocess_exec(
             "qpdf",
             "--stream-data=uncompress",
@@ -108,24 +130,17 @@ async def analyze(pdf_path):
         used_image_types = set(
             result.decode("ascii") for result in image_regex.findall(pdf_content)
         )
+        types["i"] = list(used_image_types)
 
         used_fonts = set(
-            result.decode("ascii") for result in used_font_regex.findall(pdf_content)
+            result.decode("ascii", "ignore")
+            for result in used_font_regex.findall(pdf_content)
         )
         embedded_fonts = set(
             result.decode("ascii")
             for result in embedded_font_regex.findall(pdf_content)
         )
-
-        types = {
-            "x": 0,
-            "j": 0,
-            "s": 0,
-            "t": 0,
-            "r": 0,
-            "i": list(used_image_types),
-            "f": list(used_fonts - embedded_fonts),
-        }
+        types["f"] = list(used_fonts - embedded_fonts)
 
         if is_XFA(pdf_content):
             types["x"] = 1
@@ -151,6 +166,8 @@ async def analyze(pdf_path):
         tagged.append(pdf_path)
     if types["r"]:
         rectangles.append(pdf_path)
+    if types["e"]:
+        encrypted.append(pdf_path)
 
     for image_type in types["i"]:
         image_types[image_type] += 1
@@ -203,6 +220,7 @@ async def main(directories):
     print(f"Found {len(tosource)} PDFs that use toSource")
     print(f"Found {len(tagged)} PDFs that have tags")
     print(f"Found {len(rectangles)} PDFs that use rectangles")
+    print(f"Found {len(encrypted)} encrypted PDFs")
 
     print("Most common image types:")
     print(image_types.most_common())
