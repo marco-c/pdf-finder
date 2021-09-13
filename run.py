@@ -40,6 +40,11 @@ rectangle_regex = re.compile(
     re.IGNORECASE,
 )
 
+purexfa_regex = re.compile(
+    rb"<[\n\r \t]*dynamicRender[\n\r \t]*>[\n\r \t]*required[\n\r \t]*<[\n\r \t]*/[\n\r \t]*dynamicRender[\n\r \t]*>",
+    re.IGNORECASE,
+)
+
 
 def is_XFA(content):
     return xfa_regex.search(content) is not None
@@ -69,12 +74,17 @@ def is_encrypted(content):
     return b"/Encrypt " in content
 
 
+def is_purexfa(content):
+    return purexfa_regex.search(content) is not None
+
+
 xfa = []
 js = []
 tosource = []
 tagged = []
 rectangles = []
 encrypted = []
+purexfa = []
 image_types: typing.Counter[str] = collections.Counter()
 fonts: typing.Counter[str] = collections.Counter()
 
@@ -99,6 +109,7 @@ async def analyze(pdf_path):
             "i": [],
             "f": [],
             "e": 0,
+            "p": 0,
         }
 
         async with aiofiles.open(pdf_path, "rb") as f:
@@ -152,6 +163,8 @@ async def analyze(pdf_path):
             types["t"] = 1
         if is_using_rectangles(pdf_content):
             types["r"] = 1
+        if is_purexfa(pdf_content):
+            types["p"] = 1
 
         async with aiofiles.open(types_path, "w") as f:
             await f.write(json.dumps(types))
@@ -168,6 +181,8 @@ async def analyze(pdf_path):
         rectangles.append(pdf_path)
     if types["e"]:
         encrypted.append(pdf_path)
+    if types["p"]:
+        purexfa.append(pdf_path)
 
     for image_type in types["i"]:
         image_types[image_type] += 1
@@ -221,6 +236,7 @@ async def main(directories):
     print(f"Found {len(tagged)} PDFs that have tags")
     print(f"Found {len(rectangles)} PDFs that use rectangles")
     print(f"Found {len(encrypted)} encrypted PDFs")
+    print(f"Found {len(purexfa)} pure XFA PDFs")
 
     print("Most common image types:")
     print(image_types.most_common())
