@@ -50,6 +50,11 @@ xfa_host_regex = re.compile(
     re.IGNORECASE,
 )
 
+exec_menu_item_regex = re.compile(
+    rb"app\.execMenuItem\(([^)]+)\)",
+    re.IGNORECASE,
+)
+
 
 def is_XFA(content):
     return xfa_regex.search(content) is not None
@@ -93,6 +98,7 @@ purexfa = []
 image_types: typing.Counter[str] = collections.Counter()
 fonts: typing.Counter[str] = collections.Counter()
 xfa_host_funcs: typing.Counter[str] = collections.Counter()
+exec_menu_item_items: typing.Counter[str] = collections.Counter()
 
 
 def limit_virtual_memory():
@@ -117,6 +123,7 @@ async def analyze(pdf_path):
             "e": 0,
             "p": 0,
             "xh": [],
+            "mi": [],
         }
 
         async with aiofiles.open(pdf_path, "rb") as f:
@@ -165,6 +172,12 @@ async def analyze(pdf_path):
         )
         types["xh"] = list(used_xfa_host_funcs)
 
+        used_exec_menu_item_items = set(
+            result.decode("ascii")
+            for result in exec_menu_item_regex.findall(pdf_content)
+        )
+        types["mi"] = list(used_exec_menu_item_items)
+
         if is_XFA(pdf_content):
             types["x"] = 1
         if is_JS(pdf_content):
@@ -204,6 +217,9 @@ async def analyze(pdf_path):
 
     for xfa_host_func in types["xh"]:
         xfa_host_funcs[xfa_host_func] += 1
+
+    for exec_menu_item_item in types["mi"]:
+        exec_menu_item_items[exec_menu_item_item] += 1
 
 
 async def worker(queue):
@@ -261,6 +277,9 @@ async def main(directories):
 
     print("Most commonly used xfa.host.XXX:")
     print(xfa_host_funcs.most_common())
+
+    print("Most commonly used app.execMenuItem(XXX):")
+    print(exec_menu_item_items.most_common())
 
     for type_name, type_list in (("xfa", xfa), ("js", js), ("tagged", tagged[-42:])):
         with tarfile.open(f"{type_name}.tar.gz", "w:gz") as tar:
