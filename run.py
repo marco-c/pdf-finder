@@ -174,6 +174,14 @@ async def analyze(pdf_path):
 
         used_exec_menu_item_items = set(
             result.decode("ascii")
+            .translate(
+                {
+                    ord("'"): None,
+                    ord('"'): None,
+                    ord("+"): None,
+                }
+            )
+            .strip()
             for result in exec_menu_item_regex.findall(pdf_content)
         )
         types["mi"] = list(used_exec_menu_item_items)
